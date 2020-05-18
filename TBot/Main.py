@@ -1,7 +1,8 @@
 ﻿import telebot
 from random import randrange
+from id import bot_id
 
-bot = telebot.TeleBot("1202416907:AAFpJendkHeeBEG_r0mvqysmhMcvPnBFxxk")
+bot = telebot.TeleBot(bot_id())
 
 
 def update_dicts():
@@ -97,55 +98,57 @@ def handle_data(message):
     if message.text == 'Отмена':
         del client_status[client_id]
         bot.send_message(message.chat.id, 'Отменено')
-    elif client_id in client_status and client_status[client_id] == 'g':
-        if client_id in client_base[group_keys[352446]]:
-            if message.text not in group_keys.values():
-                key = generate_key()
-                group_keys[key] = message.text
-                client_base[group_keys[key]] = []
-                del client_status[client_id]
-                update_keys()
-                bot.send_message(message.chat.id, 'Код для присоединения к группе: %s' % key)
-            else:
-                bot.send_message(message.chat.id, 'Такая группа уже существует, попробуйте еще раз')
-        else:
-            bot.send_message(message.chat.id, 'У вас нет прав на это действие')
-    elif client_id in client_status and client_status[client_id] == 'j':
-        try:
-            key = int(message.text)
-        except ValueError:
-            bot.send_message(message.chat.id, 'Вы ввели некорректный код')
-        if key in group_keys and client_id not in client_base[group_keys[key]]:
-            client_base[group_keys[key]].append(client_id)
-            del client_status[client_id]
-            update_base()
-            bot.send_message(message.chat.id, 'Вы присоединились к группе \"%s\"' % group_keys[key])
-        elif key in group_keys and client_id in client_base[group_keys[key]]:
-            bot.send_message(message.chat.id, 'Вы уже состоите в этой группе')
-        else:
-            bot.send_message(message.chat.id, 'Вы ввели некорректный код')
-    elif client_id in client_status and client_status[client_id] == 'l':
-        if message.text in client_base:
-            if client_id in client_base[message.text]:
-                client_base[message.text].remove(client_id)
-                update_keys()
-                update_base()
-                bot.send_message(client_id, 'Вы успешно покинули группу \"%s\"' % message.text)
-            else:
-                bot.send_message(client_id, 'Вы не состоите в этой группе')
-        else:
-            bot.send_message(client_id, 'Такой группы не существует')
-    elif client_id in client_status and client_status[client_id] == 'd':
-        if message.text in client_base:
+    elif client_id in client_status:
+        if client_status[client_id] == 'g':
             if client_id in client_base[group_keys[352446]]:
-                del client_base[message.text]
-                update_keys()
-                update_base()
-                bot.send_message(client_id, 'Группа успешно удалена')
+                if message.text not in group_keys.values():
+                    key = generate_key()
+                    group_keys[key] = message.text
+                    client_base[group_keys[key]] = []
+                    del client_status[client_id]
+                    update_keys()
+                    update_base()
+                    bot.send_message(message.chat.id, 'Код для присоединения к группе: %s' % key)
+                else:
+                    bot.send_message(message.chat.id, 'Такая группа уже существует, попробуйте еще раз')
             else:
-                bot.send_message(client_id, 'У вас нет прав на это действие')
-        else:
-            bot.send_message(client_id, 'Такой группы не существует')
+                bot.send_message(message.chat.id, 'У вас нет прав на это действие')
+        elif client_status[client_id] == 'j':
+            try:
+                key = int(message.text)
+            except ValueError:
+                bot.send_message(message.chat.id, 'Вы ввели некорректный код')
+            if key in group_keys and client_id not in client_base[group_keys[key]]:
+                client_base[group_keys[key]].append(client_id)
+                del client_status[client_id]
+                update_base()
+                bot.send_message(message.chat.id, 'Вы присоединились к группе \"%s\"' % group_keys[key])
+            elif key in group_keys and client_id in client_base[group_keys[key]]:
+                bot.send_message(message.chat.id, 'Вы уже состоите в этой группе')
+            else:
+                bot.send_message(message.chat.id, 'Вы ввели некорректный код')
+        elif client_status[client_id] == 'l':
+            if message.text in client_base:
+                if client_id in client_base[message.text]:
+                    client_base[message.text].remove(client_id)
+                    update_keys()
+                    update_base()
+                    bot.send_message(client_id, 'Вы успешно покинули группу \"%s\"' % message.text)
+                else:
+                    bot.send_message(client_id, 'Вы не состоите в этой группе')
+            else:
+                bot.send_message(client_id, 'Такой группы не существует')
+        elif client_status[client_id] == 'd':
+            if message.text in client_base:
+                if client_id in client_base[group_keys[352446]]:
+                    del client_base[message.text]
+                    update_keys()
+                    update_base()
+                    bot.send_message(client_id, 'Группа успешно удалена')
+                else:
+                    bot.send_message(client_id, 'У вас нет прав на это действие')
+            else:
+                bot.send_message(client_id, 'Такой группы не существует')
     else:
         bot.send_message(message.chat.id,
                          'Что это? Попробуйте написать команду заново')
