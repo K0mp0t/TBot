@@ -48,6 +48,8 @@ def update_base():
 
 
 client_status = {}  # id-статус
+forward_groups = {}  # id-список групп
+remaining_groups = {}  # id-оставшиеся группы
 client_base = {"Преподаватели": []}  # группа-список студентов
 group_keys = {352446: "Преподаватели"}  # ключ-группа
 update_dicts()
@@ -92,6 +94,48 @@ def delete_group(message):
     bot.send_message(message.chat.id, 'Введите название группы, которую хототие удалить')
 
 
+@bot.message_handler(commands=['forward_message'])
+def forward_message(message):
+    client_id = message.from_user.id
+    client_status[client_id] = 'f'
+    bot.send_message(message.chat.id, 'Введите список групп через запятую')
+
+
+def clear_lists(client_id):
+    del forward_groups[client_id]
+    del remaining_groups[client_id]
+
+
+def make_group_list(client_id):
+    group_list = []
+    for group in client_base:
+        if client_id in group:
+            group_list.append(group)
+    return group_list
+
+
+def find_key(group_name):
+    for key in group_keys.keys():
+        if group_keys[key] == group_name:
+            return key
+    return 'Я не смог найти такой группы'
+
+
+def initialize_group_list(client_id):
+    if client_id not in forward_groups:
+        forward_groups[client_id] = []
+        remaining_groups[client_id] = make_group_list(client_id)
+    else:
+        pass
+
+
+def handle_forwarding(client_id, message):
+    for group in forward_groups[client_id]:
+        for student in client_base[group]:
+            bot.forward_message(student, message.chat.id, message.message_id)
+    clear_lists(client_id)
+
+
 @bot.message_handler(content_types=['text'])
 def handle_data(message):
     client_id = message.from_user.id
@@ -104,13 +148,13 @@ def handle_data(message):
                 if message.text not in group_keys.values():
                     key = generate_key()
                     group_keys[key] = message.text
-                    client_base[group_keys[key]] = []
+                    client_base[group_keys[key]] = [client_id]
                     del client_status[client_id]
                     update_keys()
                     update_base()
                     bot.send_message(message.chat.id, 'Код для присоединения к группе: %s' % key)
                 else:
-                    bot.send_message(message.chat.id, 'Такая группа уже существует, попробуйте еще раз')
+                    bot.send_message(message.chat.id, 'Такая группа уже существует, код для присоединенеия к ней: %d' % find_key(message.text))
             else:
                 bot.send_message(message.chat.id, 'У вас нет прав на это действие')
         elif client_status[client_id] == 'j':
@@ -142,6 +186,7 @@ def handle_data(message):
             if message.text in client_base:
                 if client_id in client_base[group_keys[352446]]:
                     del client_base[message.text]
+                    del group_keys[find_key(message.text)]
                     update_keys()
                     update_base()
                     bot.send_message(client_id, 'Группа успешно удалена')
@@ -149,6 +194,19 @@ def handle_data(message):
                     bot.send_message(client_id, 'У вас нет прав на это действие')
             else:
                 bot.send_message(client_id, 'Такой группы не существует')
+        elif client_status[client_id] == 'f':
+            initialize_group_list(client_id)
+            if message.text == 'Все':
+                client_status[client_id] = 'fw'
+                bot.send_message(message.chat.id, 'Жду от вас сообщение')
+            elif message.text in client_base:
+                forward_groups[client_id].append(message.text)
+                remaining_groups[client_id].remove(message.text)
+                bot.send_message(message.chat.id, 'ОК')
+            elif message.text not in client_base:
+                bot.send_message(message.chat.id, 'Не могу найти такой группы')
+        elif client_status[client_id] == 'fw':
+            handle_forwarding(client_id, message)
     else:
         bot.send_message(message.chat.id,
                          'Что это? Попробуйте написать команду заново')
