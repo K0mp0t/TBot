@@ -98,7 +98,9 @@ def delete_group(message):
 def forward_message(message):
     client_id = message.from_user.id
     client_status[client_id] = 'f'
-    bot.send_message(message.chat.id, 'Введите список групп через запятую')
+    initialize_group_list(client_id)
+    keyboard = make_keyboard(client_id)
+    bot.send_message(message.chat.id, 'Выберите группы', reply_markup=keyboard)
 
 
 def clear_lists(client_id):
@@ -108,17 +110,27 @@ def clear_lists(client_id):
 
 def make_group_list(client_id):
     group_list = []
-    for group in client_base:
-        if client_id in group:
+    for group in group_keys.values():
+        if client_id in client_base[group]:
             group_list.append(group)
     return group_list
+
+
+def make_keyboard(client_id):  # ?
+    initialize_group_list(client_id)
+    keyboard = telebot.types.ReplyKeyboardMarkup(row_width=3, one_time_keyboard=True, resize_keyboard=True)
+    for group in remaining_groups[client_id]:
+        keyboard.add(group)
+    keyboard.add('Хватит')
+    keyboard.add('Все группы')
+
+    return keyboard
 
 
 def find_key(group_name):
     for key in group_keys.keys():
         if group_keys[key] == group_name:
             return key
-    return 'Я не смог найти такой группы'
 
 
 def initialize_group_list(client_id):
@@ -154,7 +166,9 @@ def handle_data(message):
                     update_base()
                     bot.send_message(message.chat.id, 'Код для присоединения к группе: %s' % key)
                 else:
-                    bot.send_message(message.chat.id, 'Такая группа уже существует, код для присоединенеия к ней: %d' % find_key(message.text))
+                    bot.send_message(message.chat.id,
+                                     'Такая группа уже существует, код для присоединенеия к ней: %d' % find_key(
+                                         message.text))
             else:
                 bot.send_message(message.chat.id, 'У вас нет прав на это действие')
         elif client_status[client_id] == 'j':
@@ -196,13 +210,18 @@ def handle_data(message):
                 bot.send_message(client_id, 'Такой группы не существует')
         elif client_status[client_id] == 'f':
             initialize_group_list(client_id)
-            if message.text == 'Все':
+            if message.text == 'Хватит':
                 client_status[client_id] = 'fw'
+                bot.send_message(message.chat.id, 'Жду от вас сообщение')
+            elif message.text == 'Все группы':
+                client_status[client_id] = 'fw'
+                forward_groups[client_id].extend(remaining_groups[client_id])
                 bot.send_message(message.chat.id, 'Жду от вас сообщение')
             elif message.text in client_base:
                 forward_groups[client_id].append(message.text)
                 remaining_groups[client_id].remove(message.text)
-                bot.send_message(message.chat.id, 'ОК')
+                keyboard = make_keyboard(client_id)
+                bot.send_message(message.chat.id, 'ОК', reply_markup=keyboard)
             elif message.text not in client_base:
                 bot.send_message(message.chat.id, 'Не могу найти такой группы')
         elif client_status[client_id] == 'fw':
