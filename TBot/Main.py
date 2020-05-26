@@ -63,6 +63,13 @@ def generate_key():
         generate_key()
 
 
+@bot.message_handler(commands=['start', 'help'])
+def start(message):
+    client_id = message.from_user.id
+    keyboard = make_keyboard_commands(client_id)
+    bot.send_message(message.chat.id, help_text(client_id), reply_markup=keyboard)
+
+
 @bot.message_handler(commands=['new_group'])
 def generate_new_group(message):
     client_id = message.from_user.id
@@ -70,7 +77,8 @@ def generate_new_group(message):
         client_status[message.from_user.id] = 'g'
         bot.send_message(message.chat.id, 'Введите название группы: ')
     else:
-        bot.send_message(message.chat.id, 'У вас нет прав на это действие')
+        bot.send_message(message.chat.id, 'У вас нет прав на это действие',
+                         reply_markup=make_keyboard_commands(client_id))
 
 
 @bot.message_handler(commands=['join_group'])
@@ -84,14 +92,16 @@ def join_group(message):
 def leave_group(message):
     client_id = message.from_user.id
     client_status[client_id] = 'l'
-    bot.send_message(message.chat.id, 'Введите название группы, которую хотите покинуть')
+    keyboard = make_keyboard_groups(client_id, False)
+    bot.send_message(message.chat.id, 'Введите название группы, которую хотите покинуть', reply_markup=keyboard)
 
 
 @bot.message_handler(commands=['delete_group'])
 def delete_group(message):
     client_id = message.from_user.id
     client_status[client_id] = 'd'
-    bot.send_message(message.chat.id, 'Введите название группы, которую хототие удалить')
+    keyboard = make_keyboard_groups(client_id, False)
+    bot.send_message(message.chat.id, 'Введите название группы, которую хототие удалить', reply_markup=keyboard)
 
 
 @bot.message_handler(commands=['forward_message'])
@@ -99,7 +109,7 @@ def forward_message(message):
     client_id = message.from_user.id
     client_status[client_id] = 'f'
     initialize_group_list(client_id)
-    keyboard = make_keyboard(client_id)
+    keyboard = make_keyboard_groups(client_id, True)
     bot.send_message(message.chat.id, 'Выберите группы', reply_markup=keyboard)
 
 
@@ -111,19 +121,40 @@ def clear_lists(client_id):
 def make_group_list(client_id):
     group_list = []
     for group in group_keys.values():
-        if client_id in client_base[group]:
+        if client_id in client_base[group] and group != 'Преподаватели':
             group_list.append(group)
     return group_list
 
 
-def make_keyboard(client_id):  # ?
+def make_keyboard_groups(client_id, enough_all_flag):  # ?
     initialize_group_list(client_id)
-    keyboard = telebot.types.ReplyKeyboardMarkup(row_width=3, one_time_keyboard=True, resize_keyboard=True)
-    for group in remaining_groups[client_id]:
-        keyboard.add(group)
-    keyboard.add('Хватит')
-    keyboard.add('Все группы')
+    keyboard = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+    groups = sorted(remaining_groups[client_id])
+    for i in range(0, (len(groups) // 3) + 1):
+        if len(groups) - i * 3 > 2:
+            keyboard.add(telebot.types.KeyboardButton(groups[i * 3]),
+                         telebot.types.KeyboardButton(groups[i * 3 + 1]),
+                         telebot.types.KeyboardButton(groups[i * 3 + 2]))
+        elif len(groups) - i * 3 == 2:
+            keyboard.add(telebot.types.KeyboardButton(groups[i * 3]),
+                         telebot.types.KeyboardButton(groups[i * 3 + 1]))
+        elif len(groups) - i * 3 == 1:
+            keyboard.add(telebot.types.KeyboardButton(groups[i * 3]))
+    if enough_all_flag:
+        keyboard.add('Хватит', 'Все группы', 'Отмена')
+    else:
+        keyboard.add('Отмена')
+    return keyboard
 
+
+def make_keyboard_commands(client_id):
+    keyboard = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    if client_id in client_base['Преподаватели']:
+        keyboard.add(telebot.types.KeyboardButton('/new_group'),
+                     telebot.types.KeyboardButton('/delete_group'),
+                     telebot.types.KeyboardButton('/forward_message'))
+    keyboard.add(telebot.types.KeyboardButton('/join_group'),
+                 telebot.types.KeyboardButton('/leave_group'))
     return keyboard
 
 
@@ -134,11 +165,8 @@ def find_key(group_name):
 
 
 def initialize_group_list(client_id):
-    if client_id not in forward_groups:
-        forward_groups[client_id] = []
-        remaining_groups[client_id] = make_group_list(client_id)
-    else:
-        pass
+    forward_groups[client_id] = []
+    remaining_groups[client_id] = make_group_list(client_id)
 
 
 def handle_forwarding(client_id, message):
@@ -148,12 +176,30 @@ def handle_forwarding(client_id, message):
     clear_lists(client_id)
 
 
+def sort_by_alphabet(input_str):
+    return input_str[0]
+
+
+def help_text(client_id):
+    if client_id in client_base['Преподаватели']:
+        return '/new_group - создать новую группу, название вводится вручную \n' \
+               '/delete_group - удалить существующую группу, есть возможность выбора из предложенных групп \n' \
+               '/forward_message - выбрать группы и отправить всем студентам, ' \
+               'принадлежащим этим группам сообщение(отправка документов поддерживается) \n' \
+               '/join_group - присоединиться к группе по коду \n' \
+               '/leave_group - выйти из группы, есть возможность выбора из предложенных \n'
+    else:
+        return '/join_group - присоединиться к группе по коду \n' \
+               '/leave_group - выйти из группы, есть возможность выбора из предложенных \n'
+
+
 @bot.message_handler(content_types=['text'])
 def handle_data(message):
     client_id = message.from_user.id
+    keyboard = make_keyboard_commands(client_id)
     if message.text == 'Отмена':
         del client_status[client_id]
-        bot.send_message(message.chat.id, 'Отменено')
+        bot.send_message(message.chat.id, 'Отменено', reply_markup=keyboard)
     elif client_id in client_status:
         if client_status[client_id] == 'g':
             if client_id in client_base[group_keys[352446]]:
@@ -164,38 +210,38 @@ def handle_data(message):
                     del client_status[client_id]
                     update_keys()
                     update_base()
-                    bot.send_message(message.chat.id, 'Код для присоединения к группе: %s' % key)
+                    bot.send_message(message.chat.id, 'Код для присоединения к группе: %s' % key, reply_markup=keyboard)
                 else:
                     bot.send_message(message.chat.id,
                                      'Такая группа уже существует, код для присоединенеия к ней: %d' % find_key(
-                                         message.text))
+                                         message.text), reply_markup=keyboard)
             else:
-                bot.send_message(message.chat.id, 'У вас нет прав на это действие')
+                bot.send_message(message.chat.id, 'У вас нет прав на это действие', reply_markup=keyboard)
         elif client_status[client_id] == 'j':
             try:
                 key = int(message.text)
             except ValueError:
-                bot.send_message(message.chat.id, 'Вы ввели некорректный код')
+                bot.send_message(message.chat.id, 'Вы ввели некорректный код', reply_markup=keyboard)
             if key in group_keys and client_id not in client_base[group_keys[key]]:
                 client_base[group_keys[key]].append(client_id)
                 del client_status[client_id]
                 update_base()
-                bot.send_message(message.chat.id, 'Вы присоединились к группе \"%s\"' % group_keys[key])
+                bot.send_message(message.chat.id, 'Вы присоединились к группе \"%s\"' % group_keys[key], reply_markup=keyboard)
             elif key in group_keys and client_id in client_base[group_keys[key]]:
-                bot.send_message(message.chat.id, 'Вы уже состоите в этой группе')
+                bot.send_message(message.chat.id, 'Вы уже состоите в этой группе', reply_markup=keyboard)
             else:
-                bot.send_message(message.chat.id, 'Вы ввели некорректный код')
+                bot.send_message(message.chat.id, 'Вы ввели некорректный код', reply_markup=keyboard)
         elif client_status[client_id] == 'l':
             if message.text in client_base:
                 if client_id in client_base[message.text]:
                     client_base[message.text].remove(client_id)
                     update_keys()
                     update_base()
-                    bot.send_message(client_id, 'Вы успешно покинули группу \"%s\"' % message.text)
+                    bot.send_message(client_id, 'Вы успешно покинули группу \"%s\"' % message.text, reply_markup=keyboard)
                 else:
-                    bot.send_message(client_id, 'Вы не состоите в этой группе')
+                    bot.send_message(client_id, 'Вы не состоите в этой группе', reply_markup=keyboard)
             else:
-                bot.send_message(client_id, 'Такой группы не существует')
+                bot.send_message(client_id, 'Такой группы не существует', reply_markup=keyboard)
         elif client_status[client_id] == 'd':
             if message.text in client_base:
                 if client_id in client_base[group_keys[352446]]:
@@ -203,11 +249,11 @@ def handle_data(message):
                     del group_keys[find_key(message.text)]
                     update_keys()
                     update_base()
-                    bot.send_message(client_id, 'Группа успешно удалена')
+                    bot.send_message(client_id, 'Группа успешно удалена', reply_markup=keyboard)
                 else:
-                    bot.send_message(client_id, 'У вас нет прав на это действие')
+                    bot.send_message(client_id, 'У вас нет прав на это действие', reply_markup=keyboard)
             else:
-                bot.send_message(client_id, 'Такой группы не существует')
+                bot.send_message(client_id, 'Такой группы не существует', reply_markup=keyboard)
         elif client_status[client_id] == 'f':
             initialize_group_list(client_id)
             if message.text == 'Хватит':
@@ -220,15 +266,17 @@ def handle_data(message):
             elif message.text in client_base:
                 forward_groups[client_id].append(message.text)
                 remaining_groups[client_id].remove(message.text)
-                keyboard = make_keyboard(client_id)
-                bot.send_message(message.chat.id, 'ОК', reply_markup=keyboard)
+                keyboard_groups = make_keyboard_groups(client_id, True)
+                bot.send_message(message.chat.id, 'ОК', reply_markup=keyboard_groups)
             elif message.text not in client_base:
-                bot.send_message(message.chat.id, 'Не могу найти такой группы')
+                bot.send_message(message.chat.id, 'Не могу найти такой группы', reply_markup=keyboard)
         elif client_status[client_id] == 'fw':
             handle_forwarding(client_id, message)
+            bot.send_message(message.chat.id, 'Сообщение успешко отправлено, вы тоже его получите', reply_markup=keyboard)
     else:
         bot.send_message(message.chat.id,
-                         'Что это? Попробуйте написать команду заново')
+                         'Что это? Попробуйте написать команду заново', reply_markup=keyboard)
 
 
-bot.polling()
+if __name__ == "__main__":
+    bot.polling(none_stop=True)
