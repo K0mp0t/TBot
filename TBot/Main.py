@@ -50,6 +50,7 @@ def update_base():
 client_status = {}  # id-статус
 forward_groups = {}  # id-список групп
 remaining_groups = {}  # id-оставшиеся группы
+confirmation_dict = {} # id-название удаляемой группы
 client_base = {"Преподаватели": []}  # группа-список студентов
 group_keys = {352446: "Преподаватели"}  # ключ-группа
 update_dicts()
@@ -154,7 +155,15 @@ def make_keyboard_commands(client_id):
                      telebot.types.KeyboardButton('/delete_group'),
                      telebot.types.KeyboardButton('/forward_message'))
     keyboard.add(telebot.types.KeyboardButton('/join_group'),
-                 telebot.types.KeyboardButton('/leave_group'))
+                 telebot.types.KeyboardButton('/leave_group'),
+                 telebot.types.KeyboardButton('/help'))
+    return keyboard
+
+
+def make_keyboard_confirmation():
+    keyboard = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+    keyboard.add(telebot.types.KeyboardButton('Да'),
+                 telebot.types.KeyboardButton('Нет'))
     return keyboard
 
 
@@ -245,11 +254,9 @@ def handle_data(message):
         elif client_status[client_id] == 'd':
             if message.text in client_base:
                 if client_id in client_base[group_keys[352446]]:
-                    del client_base[message.text]
-                    del group_keys[find_key(message.text)]
-                    update_keys()
-                    update_base()
-                    bot.send_message(client_id, 'Группа успешно удалена', reply_markup=keyboard)
+                    client_status[client_id] = 'c'
+                    confirmation_dict[client_id] = message.text
+                    bot.send_message(client_id, 'Вы уверены?', reply_markup=make_keyboard_confirmation())
                 else:
                     bot.send_message(client_id, 'У вас нет прав на это действие', reply_markup=keyboard)
             else:
@@ -273,6 +280,17 @@ def handle_data(message):
         elif client_status[client_id] == 'fw':
             handle_forwarding(client_id, message)
             bot.send_message(message.chat.id, 'Сообщение успешко отправлено, вы тоже его получите', reply_markup=keyboard)
+        elif client_status[client_id] == 'c':
+            if message.text == 'Да':
+                del client_status[client_id]
+                del client_base[confirmation_dict[client_id]]
+                del group_keys[find_key(confirmation_dict[client_id])]
+                update_keys()
+                update_base()
+                bot.send_message(client_id, 'Группа успешно удалена', reply_markup=keyboard)
+            else:
+                del client_status[client_id]
+                bot.send_message(client_id, 'Отменено', reply_markup=keyboard)
     else:
         bot.send_message(message.chat.id,
                          'Что это? Попробуйте написать команду заново', reply_markup=keyboard)
