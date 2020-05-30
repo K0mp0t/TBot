@@ -50,7 +50,7 @@ def update_base():
 client_status = {}  # id-статус
 forward_groups = {}  # id-список групп
 remaining_groups = {}  # id-оставшиеся группы
-confirmation_dict = {} # id-название удаляемой группы
+confirmation_dict = {}  # id-название удаляемой группы
 client_base = {"Преподаватели": []}  # группа-список студентов
 group_keys = {352446: "Преподаватели"}  # ключ-группа
 update_dicts()
@@ -127,8 +127,7 @@ def make_group_list(client_id):
     return group_list
 
 
-def make_keyboard_groups(client_id, enough_all_flag):  # ?
-    initialize_group_list(client_id)
+def make_keyboard_groups(client_id, enough_all_flag):
     keyboard = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
     groups = sorted(remaining_groups[client_id])
     for i in range(0, (len(groups) // 3) + 1):
@@ -262,7 +261,6 @@ def handle_data(message):
             else:
                 bot.send_message(client_id, 'Такой группы не существует', reply_markup=keyboard)
         elif client_status[client_id] == 'f':
-            initialize_group_list(client_id)
             if message.text == 'Хватит':
                 client_status[client_id] = 'fw'
                 bot.send_message(message.chat.id, 'Жду от вас сообщение')
@@ -270,7 +268,7 @@ def handle_data(message):
                 client_status[client_id] = 'fw'
                 forward_groups[client_id].extend(remaining_groups[client_id])
                 bot.send_message(message.chat.id, 'Жду от вас сообщение')
-            elif message.text in client_base:
+            elif message.text in client_base.keys():
                 forward_groups[client_id].append(message.text)
                 remaining_groups[client_id].remove(message.text)
                 keyboard_groups = make_keyboard_groups(client_id, True)
@@ -279,7 +277,7 @@ def handle_data(message):
                 bot.send_message(message.chat.id, 'Не могу найти такой группы', reply_markup=keyboard)
         elif client_status[client_id] == 'fw':
             handle_forwarding(client_id, message)
-            bot.send_message(message.chat.id, 'Сообщение успешко отправлено, вы тоже его получите', reply_markup=keyboard)
+            bot.send_message(message.chat.id, 'Сообщение успешно отправлено, вы тоже его получите', reply_markup=keyboard)
         elif client_status[client_id] == 'c':
             if message.text == 'Да':
                 del client_status[client_id]
