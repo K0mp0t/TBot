@@ -92,6 +92,7 @@ def join_group(message):
 @bot.message_handler(commands=['leave_group'])
 def leave_group(message):
     client_id = message.from_user.id
+    initialize_group_list(client_id)
     client_status[client_id] = 'l'
     keyboard = make_keyboard_groups(client_id, False)
     bot.send_message(message.chat.id, 'Введите название группы, которую хотите покинуть', reply_markup=keyboard)
@@ -100,6 +101,7 @@ def leave_group(message):
 @bot.message_handler(commands=['delete_group'])
 def delete_group(message):
     client_id = message.from_user.id
+    initialize_group_list(client_id)
     client_status[client_id] = 'd'
     keyboard = make_keyboard_groups(client_id, False)
     bot.send_message(message.chat.id, 'Введите название группы, которую хототие удалить', reply_markup=keyboard)
@@ -108,6 +110,7 @@ def delete_group(message):
 @bot.message_handler(commands=['forward_message'])
 def forward_message(message):
     client_id = message.from_user.id
+    initialize_group_list(client_id)
     client_status[client_id] = 'f'
     initialize_group_list(client_id)
     keyboard = make_keyboard_groups(client_id, True)
@@ -228,16 +231,16 @@ def handle_data(message):
         elif client_status[client_id] == 'j':
             try:
                 key = int(message.text)
+                if key in group_keys and client_id not in client_base[group_keys[key]]:
+                    client_base[group_keys[key]].append(client_id)
+                    del client_status[client_id]
+                    update_base()
+                    bot.send_message(message.chat.id, 'Вы присоединились к группе \"%s\"' % group_keys[key], reply_markup=keyboard)
+                elif key in group_keys and client_id in client_base[group_keys[key]]:
+                    bot.send_message(message.chat.id, 'Вы уже состоите в этой группе', reply_markup=keyboard)
+                else:
+                    bot.send_message(message.chat.id, 'Вы ввели некорректный код', reply_markup=keyboard)
             except ValueError:
-                bot.send_message(message.chat.id, 'Вы ввели некорректный код', reply_markup=keyboard)
-            if key in group_keys and client_id not in client_base[group_keys[key]]:
-                client_base[group_keys[key]].append(client_id)
-                del client_status[client_id]
-                update_base()
-                bot.send_message(message.chat.id, 'Вы присоединились к группе \"%s\"' % group_keys[key], reply_markup=keyboard)
-            elif key in group_keys and client_id in client_base[group_keys[key]]:
-                bot.send_message(message.chat.id, 'Вы уже состоите в этой группе', reply_markup=keyboard)
-            else:
                 bot.send_message(message.chat.id, 'Вы ввели некорректный код', reply_markup=keyboard)
         elif client_status[client_id] == 'l':
             if message.text in client_base:
