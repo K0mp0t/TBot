@@ -20,7 +20,10 @@ def update_dicts():
         values = separated_line[1].split('.')
         value = []
         for v in values:
-            value.append(int(v.rstrip()))
+            try:
+                value.append(int(v.rstrip()))
+            except ValueError:
+                pass
         client_base[key] = value
     b.close()
 
